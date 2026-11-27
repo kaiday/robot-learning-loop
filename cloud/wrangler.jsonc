@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "robot-learning-loop",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  // Episode files (parquet, mp4, keyframes, reports) live in R2.
+  "r2_buckets": [{ "binding": "RUNS", "bucket_name": "robot-learning-runs" }],
+  // One row per loop iteration lives in D1. Replace database_id after `wrangler d1 create rll`.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "rll", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+  ]
+  // Writes need `Authorization: Bearer <API_TOKEN>` once you run `wrangler secret put API_TOKEN`.
+}

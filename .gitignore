@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+out/
+third_party/
+cloud/node_modules/
+cloud/.wrangler/
+MUJOCO_LOG.TXT
+.pytest_cache/
