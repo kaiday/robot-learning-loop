@@ -1,10 +1,11 @@
 """Find the failure: label *what* went wrong, *when*, and in *which phase*, from the captured log only.
 
 Failure types, checked in causal order (the first one that fires is the root cause):
-  knocked       cube pushed >1.5 cm before the gripper closed (bad approach / bad perception)
-  missed_grasp  gripper finished closing without both fingers on the cube
-  slip          cube slid out of the fingers during lift / transport / lower
-  misplaced     sequence finished but cube is off target or not resting on the table
+  hit_clutter   the robot touched a clutter block before releasing the object
+  knocked       object pushed >1.5 cm before the gripper closed (bad approach / bad perception)
+  missed_grasp  gripper finished closing without both fingers on the object
+  slip          object slid out of the fingers during lift / transport / lower
+  misplaced     sequence finished but object is off target or not resting on the floor
   timeout       controller never finished
 """
 from __future__ import annotations
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 KNOCK_TOL = 0.015
 SLIP_TOL = 0.02
 CARRY_PHASES = ("lift", "transport", "lower")
+BEFORE_RELEASE = ("approach", "descend", "close", *CARRY_PHASES)
 
 
 def _event(kind: str, row, detail: dict) -> dict:
@@ -41,15 +43,23 @@ def detect_failure(result: EpisodeResult) -> dict | None:
     if df.empty:
         return {"type": "timeout", "step": 0, "t": 0.0, "phase": "approach", "detail": {}}
 
-    # knocked: cube moved before the gripper closed
+    # hit_clutter: the arm or fingers touched a clutter block
+    if "contact_clutter" in df:
+        hits = df[df.contact_clutter & df.phase.isin(BEFORE_RELEASE)]
+        if not hits.empty:
+            row = hits.iloc[0]
+            return _event("hit_clutter", row, {"finger_width": float(row.finger_width), "tcp_z": float(row.tcp_z),
+                                               "n_clutter": len(cfg.clutter)})
+
+    # knocked: object moved before the gripper closed
     pre = df[df.phase.isin(["approach", "descend"])]
-    moved = np.hypot(pre.cube_x - cfg.cube_x, pre.cube_y - cfg.cube_y)
+    moved = np.hypot(pre.obj_x - cfg.obj_x, pre.obj_y - cfg.obj_y)
     hit = pre[moved > KNOCK_TOL]
     if not hit.empty:
         row = hit.iloc[0]
         return _event("knocked", row, {"moved_m": float(moved[hit.index[0]]), "arm_contact": bool(row.contact_arm)})
 
-    # missed_grasp: at the end of close, both fingers must touch the cube
+    # missed_grasp: at the end of close, both fingers must touch the object
     close = df[df.phase == "close"]
     if close.empty:
         return _event("timeout", df.iloc[-1], {})
@@ -61,11 +71,11 @@ def detect_failure(result: EpisodeResult) -> dict | None:
             {"finger_width": float(end.finger_width), "left": bool(end.contact_left), "right": bool(end.contact_right)},
         )
 
-    # slip: cube drops away from the tcp while being carried
+    # slip: object drops away from the tcp while being carried
     carry = df[df.phase.isin(CARRY_PHASES)]
     if not carry.empty:
-        offset0 = float(end.tcp_z - end.cube_z)
-        gap = (carry.tcp_z - carry.cube_z) - offset0
+        offset0 = float(end.tcp_z - end.obj_z)
+        gap = (carry.tcp_z - carry.obj_z) - offset0
         lost = carry[(gap > SLIP_TOL) | ~(carry.contact_left & carry.contact_right)]
         if not lost.empty:
             row = lost.iloc[0]
@@ -78,5 +88,6 @@ def detect_failure(result: EpisodeResult) -> dict | None:
     return _event(
         "misplaced",
         last,
-        {"dist_m": result.final_dist, "cube_z": float(last.cube_z), "tol_m": TARGET_TOL, "resting": last.cube_z < cfg.half_size + 0.01},
+        {"dist_m": result.final_dist, "obj_z": float(last.obj_z), "tol_m": TARGET_TOL,
+         "resting": bool(last.obj_z < cfg.half_height + 0.01)},
     )

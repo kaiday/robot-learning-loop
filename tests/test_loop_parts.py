@@ -21,7 +21,7 @@ REPORT = {
     "failures": {
         "slip": {"count": 4, "rate": 0.4, "phases": {"lift": 4}, "drivers": [DRV("mass")], "examples": []},
         "missed_grasp": {"count": 1, "rate": 0.1, "phases": {"close": 1},
-                         "drivers": [DRV("cube_yaw_abs")], "examples": []},
+                         "drivers": [DRV("obj_yaw_abs")], "examples": []},
     },
 }
 

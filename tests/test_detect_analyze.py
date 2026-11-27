@@ -9,9 +9,9 @@ from rll.runner import EpisodeResult, run_episode
 def _episode(phases, seed=1):
     cfg = sample_config(seed)
     rows = [
-        dict(step=i, t=0.02 * (i + 1), phase=ph, tcp_x=0.5, tcp_y=0.0, tcp_z=0.1, cube_x=cfg.cube_x,
-             cube_y=cfg.cube_y, cube_z=0.02, cube_yaw=0.0, finger_width=0.04, gripper_cmd=0.0,
-             contact_left=True, contact_right=True, contact_floor=False, contact_arm=False)
+        dict(step=i, t=0.02 * (i + 1), phase=ph, tcp_x=0.5, tcp_y=0.0, tcp_z=0.1, obj_x=cfg.obj_x,
+             obj_y=cfg.obj_y, obj_z=0.02, obj_yaw=0.0, finger_width=0.04, gripper_cmd=0.0,
+             contact_left=True, contact_right=True, contact_floor=False, contact_arm=False, contact_clutter=False)
         for i, ph in enumerate(phases)
     ]
     return cfg, pd.DataFrame(rows)
@@ -31,7 +31,7 @@ def test_missed_grasp_when_one_finger_off():
 
 def test_knocked_when_cube_pushed_before_close():
     cfg, df = _episode(["approach", "descend", "close"])
-    df.loc[1, "cube_x"] += 0.05
+    df.loc[1, "obj_x"] += 0.05
     assert detect_failure(EpisodeResult(cfg, False, df, 0.2))["type"] == "knocked"
 
 
